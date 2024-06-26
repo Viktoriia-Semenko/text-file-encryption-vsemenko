@@ -2,9 +2,56 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <dlfcn.h>
 
 using namespace std;
 
+class CaesarCipher
+{
+private:
+    void* handle;
+    typedef char* (*encrypt_func)(char*, int);
+    typedef char* (*decrypt_func)(char*, int);
+
+    encrypt_func encrypt_pointer;
+    decrypt_func decrypt_pointer;
+
+public:
+    CaesarCipher(const char* path_to_lib){
+        handle = dlopen(path_to_lib, RTLD_LAZY);
+        if (!handle) {
+            cerr << "Lib not found" << dlerror() << endl;
+            exit(EXIT_FAILURE);
+        }
+
+        encrypt_func encrypt = (encrypt_func)dlsym(handle, "encrypt");
+        decrypt_func decrypt = (decrypt_func)dlsym(handle, "decrypt");
+
+        if (decrypt == nullptr || encrypt == nullptr) {
+            cerr << "Proc not found" << dlerror() << endl;
+            dlclose(handle);
+            exit(EXIT_FAILURE);
+        }
+    }
+    ~CaesarCipher(){
+        if (handle){
+            dlclose(handle);
+        }
+    }
+
+    void encrypt(char* text, int key){
+        char* result = encrypt_pointer(text, key);
+        strcpy(text, result);
+        free(result);
+    }
+
+    void decrypt(char* text, int key){
+        char* result = decrypt_pointer(text, key);
+        strcpy(text, result);
+        free(result);
+    }
+
+};
 class UndoRedoBuffer
 {
 private:
