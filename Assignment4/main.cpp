@@ -796,7 +796,7 @@ int main() {
     Text text(rows, buffer_size);
     CommandLineInterface command_line(CaesarCipher(nullptr));
     FileHandler file_handler;
-    CaesarCipher caesar_cipher("libcaesar.so");
+    CaesarCipher caesar_cipher("../libcaesar.so");
 
     command_line.print_help();
     while (true) {
