@@ -207,25 +207,23 @@ public:
         cin >> line >> index >> num_of_symbols;
     }
     // new
-    void input_file(char* file_path){
+    void input_file(char* input_path){
         cout << "Enter input file path: ";
-        cin.getline(file_path, 100);
+        cin >> input_path;
     }
-    void output_file(char* path) {
+    void output_file(char* output_path) {
         cout << "Enter output file path: ";
-        cin.getline(path, 100);
+        cin >> output_path;
     }
 
     void encrypt_decrypt_choice(int &choice) {
         cout << "Enter 1 to encrypt or 2 to decrypt: ";
         cin >> choice;
-        cin.ignore();
     }
 
     void key_for_cipher(int &key) {
         cout << "Enter the key: ";
         cin >> key;
-        cin.ignore();
     }
 };
 
@@ -690,7 +688,6 @@ public:
 class CommandLineInterface
 {
 private:
-    Text text;
     CaesarCipher cipher;
     ConsoleInput console_input;
 public:
@@ -794,9 +791,9 @@ int main() {
     int user_command;
 
     Text text(rows, buffer_size);
-    CommandLineInterface command_line(CaesarCipher(nullptr));
-    FileHandler file_handler;
     CaesarCipher caesar_cipher("../libcaesar.so");
+    CommandLineInterface command_line(caesar_cipher);
+    FileHandler file_handler;
 
     command_line.print_help();
     while (true) {
