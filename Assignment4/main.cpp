@@ -9,6 +9,7 @@ using namespace std;
 class CaesarCipher
 {
 private:
+    int buffer_size;
     void* handle;
     typedef char* (*encrypt_func)(char*, int);
     typedef char* (*decrypt_func)(char*, int);
@@ -17,17 +18,18 @@ private:
     decrypt_func decrypt_pointer;
 
 public:
-    CaesarCipher(const char* path_to_lib){
+    explicit CaesarCipher(const char* path_to_lib, int buffer = 256) : buffer_size(buffer)
+    {
         handle = dlopen(path_to_lib, RTLD_LAZY);
         if (!handle) {
             cerr << "Lib not found" << dlerror() << endl;
             exit(EXIT_FAILURE);
         }
 
-        encrypt_func encrypt = (encrypt_func)dlsym(handle, "encrypt");
-        decrypt_func decrypt = (decrypt_func)dlsym(handle, "decrypt");
+        encrypt_pointer = (encrypt_func)dlsym(handle, "encrypt");
+        decrypt_pointer = (decrypt_func)dlsym(handle, "decrypt");
 
-        if (decrypt == nullptr || encrypt == nullptr) {
+        if (encrypt_pointer == nullptr || decrypt_pointer == nullptr) {
             cerr << "Proc not found" << dlerror() << endl;
             dlclose(handle);
             exit(EXIT_FAILURE);
@@ -41,17 +43,28 @@ public:
 
     void encrypt(char* text, int key){
         char* result = encrypt_pointer(text, key);
-        strcpy(text, result);
-        free(result);
+        if (result) {
+            strncpy(text, result, buffer_size - 1);
+            text[buffer_size - 1] = '\0';
+            free(result);
+        } else {
+            cerr << "Encryption failed" << endl;
+        }
     }
 
     void decrypt(char* text, int key){
         char* result = decrypt_pointer(text, key);
-        strcpy(text, result);
-        free(result);
+        if (result) {
+            strncpy(text, result, buffer_size - 1);
+            text[buffer_size - 1] = '\0';
+            free(result);
+        } else {
+            cerr << "Decryption failed" << endl;
+        }
     }
 
 };
+
 class UndoRedoBuffer
 {
 private:
@@ -67,7 +80,7 @@ private:
 
 public:
     UndoRedoBuffer(int rows, int buffer)
-            : buffer_size(buffer), row_number(rows), index(0), redo_index(0), count_states(0), count_redo_states(0)// ініціалізація обʼєктів класу
+            : buffer_size(buffer), row_number(rows), index(0), redo_index(0), count_states(0), count_redo_states(0)
     {
         three_states = (char***)malloc(undo_buffer_size * sizeof(char**));
         redo_states = (char***)malloc(undo_buffer_size * sizeof(char**));
@@ -118,8 +131,8 @@ public:
         redo_states = nullptr;
     }
 
-    void save_state(char** text) { // зберігає поточний стан тексту
-        for (int i = 0; i < row_number; i++) { // проходження по всіх рядках тексту
+    void save_state(char** text) {
+        for (int i = 0; i < row_number; i++) {
             strncpy(three_states[index][i], text[i], buffer_size - 1);
             three_states[index][i][buffer_size - 1] = '\0';
 
@@ -140,8 +153,8 @@ public:
         }
     }
 
-    bool load_state(char** text) { // вивантаження стану
-        if (count_states == 0) { // якщо немає станів для відміни
+    bool load_state(char** text) {
+        if (count_states == 0) {
             cout << "No undo could be done." << endl;
             return false;
         }
@@ -193,18 +206,32 @@ public:
         cout << "Choose line, index and number of symbols: ";
         cin >> line >> index >> num_of_symbols;
     }
+    // new
+    void input_file(char* file_path){
+        cout << "Enter input file path: ";
+        cin.getline(file_path, 100);
+    }
+    void output_file(char* path) {
+        cout << "Enter output file path: ";
+        cin.getline(path, 100);
+    }
 
+    void encrypt_decrypt_choice(int &choice) {
+        cout << "Enter 1 to encrypt or 2 to decrypt: ";
+        cin >> choice;
+        cin.ignore();
+    }
+
+    void key_for_cipher(int &key) {
+        cout << "Enter the key: ";
+        cin >> key;
+        cin.ignore();
+    }
 };
 
-class Text
+class FileHandler
 {
 private:
-    char** text;
-    char* clipboard; // буфер обміну
-    int row_number;
-    int buffer_size;
-    int line_count;
-    UndoRedoBuffer undo_redo_buffer;
     ConsoleInput console_input;
 
     static bool file_exists(const char *filename){
@@ -216,6 +243,75 @@ private:
         }
         return is_exists;
     }
+
+public:
+    void save_info(char** text, int line_count) {
+        char save_name[100];
+        console_input.file_name(save_name);
+
+        FILE* file;
+        if (file_exists(save_name)) {
+            cout << "Do you want to overwrite this file (y/n)?: ";
+            char response;
+            cin.ignore();
+            cin.get(response);
+
+            if (response == 'y') {
+                file = fopen(save_name, "w");
+            } else if (response == 'n') {
+                file = fopen(save_name, "a");
+                fseek(file, 0, SEEK_END);
+            } else {
+                std::cout << "Invalid answer" << std::endl;
+                return;
+            }
+
+        } else {
+            file = fopen(save_name, "w");
+        }
+        if (file == nullptr) {
+            cerr << "Error while opening file" << endl;
+            return;
+        }
+
+        for (int i = 0; i < line_count; ++i) {
+            fprintf(file, "%s\n", text[i]);
+        }
+        fclose(file);
+        cout << "Text has been saved successfully" << endl;
+    }
+
+    void load_info() {
+        char load_name[100];
+
+        console_input.file_name(load_name);
+
+        FILE* file = fopen(load_name, "r");
+        if (file == nullptr) {
+            cerr << "Error opening file." << endl;
+            return;
+        }
+
+        char my_string[256];
+        while (fgets(my_string, sizeof(my_string), file) != nullptr) {
+            cout << my_string;
+        }
+        fclose(file);
+        cout << "Text has been loaded successfully" << endl;
+    }
+};
+
+class Text
+{
+private:
+//    char** text;
+    char* clipboard; // буфер обміну
+    int row_number;
+    int buffer_size;
+//    int line_count;
+    UndoRedoBuffer undo_redo_buffer;
+    ConsoleInput console_input;
+
     void save_state() {
         undo_redo_buffer.save_state(text);
     }
@@ -224,6 +320,8 @@ private:
     }
 
 public:
+    char** text;
+    int line_count;
     explicit Text (int rows = 10, int buffer = 256)
             : text(nullptr), row_number(rows), buffer_size(buffer), line_count(0), undo_redo_buffer(rows, buffer), clipboard(nullptr)
     {
@@ -258,26 +356,6 @@ public:
         text = nullptr;
         free(clipboard);
         clipboard = nullptr;
-    }
-
-    static void print_help() {
-        cout << "This program is the 'Simple Text Editor'\n"
-             << "It implements the following commands:\n"
-             << "0 - See the commands\n"
-             << "1 - Append text symbols to the end\n"
-             << "2 - Start the new line\n"
-             << "3 - Saving the information\n"
-             << "4 - Loading the information\n"
-             << "5 - Print the current text to console\n"
-             << "6 - Insert the text by line and symbol index\n"
-             << "7 - Search for the text\n"
-             << "8 - Delete the text by line and index\n"
-             << "9 - Undo latest command\n"
-             << "10 - Redo latest command\n"
-             << "11 - Cut text\n"
-             << "12 - Copy text\n"
-             << "13 - Paste text\n"
-             << "14 - Insert text with replacement\n";
     }
 
     void append_text_to_end(){
@@ -347,74 +425,6 @@ public:
         line_count++; // до підрахунку рядків додаємо рядок
         cout << "New line is started." << endl;
         //save_redo_state();
-    }
-
-    void save_info() {
-        char save_name[100];
-        console_input.file_name(save_name);
-
-        FILE* file;
-        if (file_exists(save_name)) {
-            cout << "Do you want to overwrite this file (y/n)?: ";
-            char response;
-            cin.ignore();
-            cin.get(response);
-
-            if (response == 'y') {
-                file = fopen(save_name, "w");
-            } else if (response == 'n') {
-                file = fopen(save_name, "a");
-                fseek(file, 0, SEEK_END);
-            } else {
-                std::cout << "Invalid answer" << std::endl;
-                return;
-            }
-
-        } else {
-            file = fopen(save_name, "w");
-        }
-        if (file == nullptr) {
-            cerr << "Error while opening file" << endl;
-            return;
-        }
-
-        for (int i = 0; i < line_count; ++i) {
-            fprintf(file, "%s\n", text[i]);
-        }
-        fclose(file);
-        cout << "Text has been saved successfully" << endl;
-    }
-
-    void load_info() {
-        char load_name[100];
-
-        console_input.file_name(load_name);
-
-        FILE* file = fopen(load_name, "r");
-        if (file == nullptr) {
-            cerr << "Error opening file." << endl;
-            return;
-        }
-
-        char my_string[256];
-        while (fgets(my_string, sizeof(my_string), file) != nullptr) {
-            cout << my_string;
-        }
-        fclose(file);
-        cout << "Text has been loaded successfully" << endl;
-    }
-
-    void print_text() const{
-
-        if (text == nullptr) {
-            cout << "Text is empty" << endl;
-            return;
-        }
-        for (int i = 0; i < line_count; ++i) {
-            if (text[i] != nullptr){
-                cout << text[i] << endl;
-            }
-        }
     }
 
     void insert_text_by_line() {
@@ -677,6 +687,88 @@ public:
     }
 };
 
+class CommandLineInterface
+{
+private:
+    Text text;
+    CaesarCipher cipher;
+    ConsoleInput console_input;
+public:
+    static void print_help() {
+        cout << "This program is the 'Simple Text Editor'\n"
+             << "It implements the following commands:\n"
+             << "0 - See the commands\n"
+             << "1 - Append text symbols to the end\n"
+             << "2 - Start the new line\n"
+             << "3 - Saving the information\n"
+             << "4 - Loading the information\n"
+             << "5 - Print the current text to console\n"
+             << "6 - Insert the text by line and symbol index\n"
+             << "7 - Search for the text\n"
+             << "8 - Delete the text by line and index\n"
+             << "9 - Undo latest command\n"
+             << "10 - Redo latest command\n"
+             << "11 - Cut text\n"
+             << "12 - Copy text\n"
+             << "13 - Paste text\n"
+             << "14 - Insert text with replacement\n"
+             << "15 - Encrypt text\n"
+             << "16 - Decrypt text\n";
+    }
+
+    void print_text(char** text, int line_count) {
+        if (text == nullptr) {
+            cout << "Text is empty" << endl;
+            return;
+        }
+        for (int i = 0; i < line_count; ++i) {
+            if (text[i] != nullptr){
+                cout << text[i] << endl;
+            }
+        }
+    }
+
+    void encrypt_decrypt(){
+        int choice, key;
+        char input_path[100], output_path[100];
+
+        console_input.encrypt_decrypt_choice(choice);
+        console_input.input_file(input_path);
+        console_input.output_file(output_path);
+        console_input.key_for_cipher(key);
+
+        FILE* input_file = fopen(input_path, "r");
+        if (input_file == nullptr) {
+            cout << "Error opening input file" << endl;
+            return;
+        }
+
+        FILE* output_file = fopen(output_path, "w");
+        if (output_file == nullptr) {
+            cout << "Error opening output file." << endl;
+            fclose(input_file);
+            return;
+        }
+
+        char line[1024];
+        while (fgets(line, sizeof(line), input_file)) {
+            if (choice == 1) {
+                cipher.encrypt(line, key);
+            } else if (choice == 2) {
+                cipher.decrypt(line, key);
+            }
+            fputs(line, output_file);
+        }
+
+        fclose(input_file);
+        fclose(output_file);
+        cout << "Operation is successful" << endl;
+    }
+
+    explicit CommandLineInterface(const CaesarCipher& cipher) : cipher(cipher) {
+    }
+};
+
 enum Commands {
     COMMAND_HELP = 0,
     COMMAND_APPEND = 1,
@@ -692,15 +784,21 @@ enum Commands {
     COMMAND_CUT = 11,
     COMMAND_COPY = 12,
     COMMAND_PASTE = 13,
-    COMMAND_INSERT_REPLACE = 14
-
+    COMMAND_INSERT_REPLACE = 14,
+    COMMAND_ENCRYPT_DECRYPT = 15
 };
 
 int main() {
-    Text text;
+    int rows = 10;
+    int buffer_size = 256;
     int user_command;
 
-    text.print_help();
+    Text text(rows, buffer_size);
+    CommandLineInterface command_line(CaesarCipher(nullptr));
+    FileHandler file_handler;
+    CaesarCipher caesar_cipher("libcaesar.so");
+
+    command_line.print_help();
     while (true) {
         char continue_input[2];
         cout << "Enter the command: ";
@@ -712,7 +810,7 @@ int main() {
         }
         switch (user_command) {
             case COMMAND_HELP:
-                text.print_help();
+                command_line.print_help();
                 break;
             case COMMAND_APPEND:
                 text.append_text_to_end();
@@ -721,13 +819,13 @@ int main() {
                 text.start_new_line();
                 break;
             case COMMAND_SAVE:
-                text.save_info();
+                file_handler.save_info(text.text, text.line_count);
                 break;
             case COMMAND_LOAD:
-                text.load_info();
+                file_handler.load_info();
                 break;
             case COMMAND_PRINT:
-                text.print_text();
+                command_line.print_text(text.text, text.line_count);
                 break;
             case COMMAND_INSERT_LI:
                 text.insert_text_by_line();
@@ -756,6 +854,8 @@ int main() {
             case COMMAND_INSERT_REPLACE:
                 text.insert_with_replacement();
                 break;
+            case COMMAND_ENCRYPT_DECRYPT:
+                command_line.encrypt_decrypt();
             default:
                 printf("This command is not implemented\n");
         }
