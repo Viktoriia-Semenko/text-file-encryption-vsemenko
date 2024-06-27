@@ -14,8 +14,8 @@ private:
     typedef char* (*encrypt_func)(char*, int);
     typedef char* (*decrypt_func)(char*, int);
 
-    encrypt_func encrypt_pointer;
-    decrypt_func decrypt_pointer;
+    encrypt_func encrypt;
+    decrypt_func decrypt;
 
 public:
     explicit CaesarCipher(const char* path_to_lib, int buffer = 256) : buffer_size(buffer)
@@ -26,10 +26,10 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        encrypt_pointer = (encrypt_func)dlsym(handle, "encrypt");
-        decrypt_pointer = (decrypt_func)dlsym(handle, "decrypt");
+        encrypt = (encrypt_func)dlsym(handle, "encrypt");
+        decrypt = (decrypt_func)dlsym(handle, "decrypt");
 
-        if (encrypt_pointer == nullptr || decrypt_pointer == nullptr) {
+        if (encrypt == nullptr || decrypt == nullptr) {
             cerr << "Proc not found" << dlerror() << endl;
             dlclose(handle);
             exit(EXIT_FAILURE);
@@ -41,8 +41,8 @@ public:
         }
     }
 
-    void encrypt(char* text, int key){
-        char* result = encrypt_pointer(text, key);
+    void encrypt_text(char* text, int key){
+        char* result = encrypt(text, key);
         if (result) {
             strncpy(text, result, buffer_size - 1);
             text[buffer_size - 1] = '\0';
@@ -52,8 +52,8 @@ public:
         }
     }
 
-    void decrypt(char* text, int key){
-        char* result = decrypt_pointer(text, key);
+    void decrypt_text(char* text, int key){
+        char* result = decrypt(text, key);
         if (result) {
             strncpy(text, result, buffer_size - 1);
             text[buffer_size - 1] = '\0';
@@ -753,9 +753,9 @@ public:
         char line[1024];
         while (fgets(line, sizeof(line), input_file)) {
             if (choice == 1) {
-                cipher.encrypt(line, key);
+                cipher.encrypt_text(line, key);
             } else if (choice == 2) {
-                cipher.decrypt(line, key);
+                cipher.decrypt_text(line, key);
             }
             fputs(line, output_file);
         }
