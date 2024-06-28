@@ -18,6 +18,8 @@ private:
     decrypt_func decrypt;
 
 public:
+    CaesarCipher() : buffer_size(0), handle(nullptr), encrypt(nullptr), decrypt(nullptr) {}
+
     explicit CaesarCipher(const char* path_to_lib, int buffer = 256) : buffer_size(buffer)
     {
         handle = dlopen(path_to_lib, RTLD_LAZY);
@@ -220,7 +222,6 @@ public:
         cout << "Enter 1 to encrypt or 2 to decrypt: ";
         cin >> choice;
     }
-
     void key_for_cipher(int &key) {
         cout << "Enter the key: ";
         cin >> key;
@@ -302,11 +303,9 @@ public:
 class Text
 {
 private:
-//    char** text;
-    char* clipboard; // буфер обміну
+    char* clipboard;
     int row_number;
     int buffer_size;
-//    int line_count;
     UndoRedoBuffer undo_redo_buffer;
     ConsoleInput console_input;
 
@@ -334,7 +333,7 @@ public:
                 cerr << "Cannot allocate memory for this input" << endl;
                 exit(EXIT_FAILURE);
             }
-            text[i][0] = '\0'; // ініціалізуємо кожен рядок як порожній
+            text[i][0] = '\0';
         }
 
         clipboard = (char*)malloc(buffer_size * sizeof(char));
@@ -358,10 +357,9 @@ public:
 
     void append_text_to_end(){
         save_state();
-        //save_redo_state();
-        char* buffer = nullptr; // цей вказівник ще не використовується
+        char* buffer = nullptr;
         size_t local_buffer_size = 0;
-        ssize_t input_length; // довжина рядка що зчитали
+        ssize_t input_length;
 
         console_input.append_text();
 
@@ -402,7 +400,6 @@ public:
 
     void start_new_line(){
         save_state();
-        //save_redo_state();
         if (line_count >= row_number){
             row_number *= 2; // якщо недостатньо рядків, то виділяємо в два рази більше
             text = (char**)realloc(text, row_number * sizeof(char*));
@@ -422,12 +419,11 @@ public:
         text[line_count][0] = '\0';
         line_count++; // до підрахунку рядків додаємо рядок
         cout << "New line is started." << endl;
-        //save_redo_state();
+        save_redo_state();
     }
 
     void insert_text_by_line() {
         save_state();
-        // save_redo_state();
         int line, index;
         char* buffer = nullptr;
         size_t local_buffer_size = 0;
@@ -480,7 +476,7 @@ public:
         free(buffer);
 
         cout << "Text has been inserted." << endl;
-        // save_redo_state();
+        save_redo_state();
     }
 
     void search_text() {
@@ -506,7 +502,6 @@ public:
 
     void delete_text(int line = -1, int index = -1, int num_of_symbols = -1, bool ask_for_input = true){
         save_state();
-        // save_redo_state();
         // input
         if (ask_for_input) {
             console_input.line_index_num(line, index, num_of_symbols);
@@ -539,7 +534,7 @@ public:
 
         free(temporary_buffer);
         cout << "Text has been deleted successfully." << endl;
-        //save_redo_state();
+        save_redo_state();
 
     }
 
@@ -561,7 +556,6 @@ public:
 
     void copy_text(int line = -1, int index = -1, int num_of_symbols = -1, bool ask_for_input = true) {
         save_state();
-        //save_redo_state();
 
         if (ask_for_input) {
             console_input.line_index_num(line, index, num_of_symbols);
@@ -580,7 +574,7 @@ public:
         strncpy(clipboard, text[line] + index, num_of_symbols); // копіємо обраний текст в буфер обміну
         clipboard[num_of_symbols] = '\0'; // зануляємо текст що додали в буфер
         cout << "Text has been copied to clipboard." << endl;
-        //save_redo_state();
+        save_redo_state();
     }
 
     void cut_text() {
@@ -592,7 +586,6 @@ public:
 
     void paste_text() {
         save_state();
-        //save_redo_state();
         int line, index;
         console_input.line_index(line, index);
 
@@ -628,12 +621,11 @@ public:
 
         free(temporary_buffer);
         cout << "Text has been pasted from clipboard." << endl;
-        // save_redo_state();
+        save_redo_state();
     }
 
     void insert_with_replacement() {
         save_state();
-        //save_redo_state();
         char* buffer = nullptr; // зберігання інпут тексту
         size_t local_buffer_size = 0;
 
@@ -681,8 +673,28 @@ public:
         free(buffer);
 
         cout << "Text has been inserted with replacement." << endl;
-        //save_redo_state();
+        save_redo_state();
     }
+};
+
+enum Commands {
+    COMMAND_HELP = 0,
+    COMMAND_APPEND = 1,
+    COMMAND_NEW_LINE = 2,
+    COMMAND_SAVE = 3,
+    COMMAND_LOAD = 4,
+    COMMAND_PRINT = 5,
+    COMMAND_INSERT_LI = 6,
+    COMMAND_SEARCH = 7,
+    COMMAND_DELETE = 8,
+    COMMAND_UNDO = 9,
+    COMMAND_REDO = 10,
+    COMMAND_CUT = 11,
+    COMMAND_COPY = 12,
+    COMMAND_PASTE = 13,
+    COMMAND_INSERT_REPLACE = 14,
+    COMMAND_ENCRYPT_DECRYPT = 15,
+    COMMAND_CIPHER_CONSOLE = 16
 };
 
 class CommandLineInterface
@@ -691,6 +703,7 @@ private:
     CaesarCipher cipher;
     ConsoleInput console_input;
 public:
+
     static void print_help() {
         cout << "This program is the 'Simple Text Editor'\n"
              << "It implements the following commands:\n"
@@ -709,8 +722,7 @@ public:
              << "12 - Copy text\n"
              << "13 - Paste text\n"
              << "14 - Insert text with replacement\n"
-             << "15 - Encrypt text\n"
-             << "16 - Decrypt text\n";
+             << "15 - Encrypt text\n";
     }
 
     void print_text(char** text, int line_count) {
@@ -723,6 +735,23 @@ public:
                 cout << text[i] << endl;
             }
         }
+    }
+
+    void encrypt_decrypt_console(char** text, int line_count) {
+        int choice, key;
+        console_input.encrypt_decrypt_choice(choice);
+        console_input.key_for_cipher(key);
+
+        for (int i = 0; i < line_count; ++i) {
+            if (choice == 1) {
+                cipher.encrypt_text(text[i], key);
+                cout << "Encrypted text: " << text[i] << endl;
+            } else if (choice == 2) {
+                cipher.decrypt_text(text[i], key);
+                cout << "Decrypted text: " << text[i] << endl;
+            }
+        }
+        cout << "Operation is successful" << endl;
     }
 
     void encrypt_decrypt(){
@@ -762,107 +791,94 @@ public:
         cout << "Operation is successful" << endl;
     }
 
-    explicit CommandLineInterface(const CaesarCipher& cipher) : cipher(cipher) {
-    }
-};
 
-enum Commands {
-    COMMAND_HELP = 0,
-    COMMAND_APPEND = 1,
-    COMMAND_NEW_LINE = 2,
-    COMMAND_SAVE = 3,
-    COMMAND_LOAD = 4,
-    COMMAND_PRINT = 5,
-    COMMAND_INSERT_LI = 6,
-    COMMAND_SEARCH = 7,
-    COMMAND_DELETE = 8,
-    COMMAND_UNDO = 9,
-    COMMAND_REDO = 10,
-    COMMAND_CUT = 11,
-    COMMAND_COPY = 12,
-    COMMAND_PASTE = 13,
-    COMMAND_INSERT_REPLACE = 14,
-    COMMAND_ENCRYPT_DECRYPT = 15
+    void run(){
+        int rows = 10;
+        int buffer_size = 256;
+        int user_command;
+
+        Text text(rows, buffer_size);
+        CaesarCipher caesar_cipher("../libcaesar.so");
+        FileHandler file_handler;
+
+        print_help();
+        while (true) {
+            char continue_input[2];
+            cout << "Enter the command: ";
+            if (scanf("%d", &user_command) != 1) {
+                cout << "Invalid input. Please, enter the number given in the help-menu\n" << endl;
+                int a;
+                while ((a = getchar()) != '\n') {}
+                continue;
+            }
+            switch (user_command) {
+                case COMMAND_HELP:
+                    print_help();
+                    break;
+                case COMMAND_APPEND:
+                    text.append_text_to_end();
+                    break;
+                case COMMAND_NEW_LINE:
+                    text.start_new_line();
+                    break;
+                case COMMAND_SAVE:
+                    file_handler.save_info(text.text, text.line_count);
+                    break;
+                case COMMAND_LOAD:
+                    file_handler.load_info();
+                    break;
+                case COMMAND_PRINT:
+                    print_text(text.text, text.line_count);
+                    break;
+                case COMMAND_INSERT_LI:
+                    text.insert_text_by_line();
+                    break;
+                case COMMAND_SEARCH:
+                    text.search_text();
+                    break;
+                case COMMAND_DELETE:
+                    text.delete_text();
+                    break;
+                case COMMAND_UNDO:
+                    text.undo_command();
+                    break;
+                case COMMAND_REDO:
+                    text.redo_command();
+                    break;
+                case COMMAND_CUT:
+                    text.cut_text();
+                    break;
+                case COMMAND_COPY:
+                    text.copy_text();
+                    break;
+                case COMMAND_PASTE:
+                    text.paste_text();
+                    break;
+                case COMMAND_INSERT_REPLACE:
+                    text.insert_with_replacement();
+                    break;
+                case COMMAND_ENCRYPT_DECRYPT:
+                    encrypt_decrypt();
+                    break;
+                case COMMAND_CIPHER_CONSOLE:
+                    encrypt_decrypt_console(text.text, text.line_count);
+                    break;
+                default:
+                    printf("This command is not implemented\n");
+            }
+            cout << "\nDo you want to continue?:(y/n) ";
+            cin >> continue_input;
+            if (strcmp(continue_input, "y") == 0) {
+                continue;
+            } else if (strcmp(continue_input, "n") == 0) {
+                break;
+            } else cout << "Enter a valid answer\n" << endl;
+        }
+    }
 };
 
 int main() {
-    int rows = 10;
-    int buffer_size = 256;
-    int user_command;
-
-    Text text(rows, buffer_size);
-    CaesarCipher caesar_cipher("../libcaesar.so");
-    CommandLineInterface command_line(caesar_cipher);
-    FileHandler file_handler;
-
-    command_line.print_help();
-    while (true) {
-        char continue_input[2];
-        cout << "Enter the command: ";
-        if (scanf("%d", &user_command) != 1) {
-            cout << "Invalid input. Please, enter the number given in the help-menu.\n" << endl;
-            int a;
-            while ((a = getchar()) != '\n') {}
-            continue;
-        }
-        switch (user_command) {
-            case COMMAND_HELP:
-                command_line.print_help();
-                break;
-            case COMMAND_APPEND:
-                text.append_text_to_end();
-                break;
-            case COMMAND_NEW_LINE:
-                text.start_new_line();
-                break;
-            case COMMAND_SAVE:
-                file_handler.save_info(text.text, text.line_count);
-                break;
-            case COMMAND_LOAD:
-                file_handler.load_info();
-                break;
-            case COMMAND_PRINT:
-                command_line.print_text(text.text, text.line_count);
-                break;
-            case COMMAND_INSERT_LI:
-                text.insert_text_by_line();
-                break;
-            case COMMAND_SEARCH:
-                text.search_text();
-                break;
-            case COMMAND_DELETE:
-                text.delete_text();
-                break;
-            case COMMAND_UNDO:
-                text.undo_command();
-                break;
-            case COMMAND_REDO:
-                text.redo_command();
-                break;
-            case COMMAND_CUT:
-                text.cut_text();
-                break;
-            case COMMAND_COPY:
-                text.copy_text();
-                break;
-            case COMMAND_PASTE:
-                text.paste_text();
-                break;
-            case COMMAND_INSERT_REPLACE:
-                text.insert_with_replacement();
-                break;
-            case COMMAND_ENCRYPT_DECRYPT:
-                command_line.encrypt_decrypt();
-            default:
-                printf("This command is not implemented\n");
-        }
-        cout << "\nDo you want to continue?:(y/n) ";
-        cin >> continue_input;
-        if (strcmp(continue_input, "y") == 0) {
-            continue;
-        } else if (strcmp(continue_input, "n") == 0) {
-            break;
-        } else cout << "Enter a valid answer\n" << endl;
-    }
+    CommandLineInterface cli;
+    cli.run();
     return 0;
 }
