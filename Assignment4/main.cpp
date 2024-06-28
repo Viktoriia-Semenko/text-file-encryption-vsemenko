@@ -700,6 +700,7 @@ enum Commands {
 class CommandLineInterface
 {
 private:
+    const int CHUNK_SIZE = 128;
     CaesarCipher cipher;
     ConsoleInput console_input;
 public:
@@ -776,19 +777,28 @@ public:
             return;
         }
 
-        char line[1024];
-        while (fgets(line, sizeof(line), input_file)) {
+        char chunk[CHUNK_SIZE + 1];
+        size_t bytes_read;
+
+        while ((bytes_read = fread(chunk, 1, CHUNK_SIZE, input_file)) > 0) {
+            chunk[bytes_read] = '\0';
             if (choice == 1) {
-                cipher.encrypt_text(line, key);
+                cipher.encrypt_text(chunk, key);
             } else if (choice == 2) {
-                cipher.decrypt_text(line, key);
+                cipher.decrypt_text(chunk, key);
+            } else {
+                cerr << "Invalid choice\n" << endl;
+                fclose(input_file);
+                fclose(output_file);
+                return;
             }
-            fputs(line, output_file);
+
+            fwrite(chunk, 1, bytes_read, output_file);
         }
 
         fclose(input_file);
         fclose(output_file);
-        cout << "Operation is successful" << endl;
+        cout << "File has been processed successfully" << endl;
     }
 
 
