@@ -698,7 +698,8 @@ enum Commands {
     COMMAND_COPY = 12,
     COMMAND_PASTE = 13,
     COMMAND_INSERT_REPLACE = 14,
-    COMMAND_ENCRYPT_DECRYPT = 15
+    COMMAND_ENCRYPT_DECRYPT = 15,
+    COMMAND_CIPHER_CONSOLE = 16
 };
 
 class CommandLineInterface
@@ -741,7 +742,22 @@ public:
             }
         }
     }
+    void encrypt_decrypt_console(char** text, int line_count) {
+        int choice, key;
+        console_input.encrypt_decrypt_choice(choice);
+        console_input.key_for_cipher(key);
 
+        for (int i = 0; i < line_count; ++i) {
+            if (choice == 1) {
+                cipher.encrypt_text(text[i], key);
+                cout << "Encrypted text: " << text[i] << endl;
+            } else if (choice == 2) {
+                cipher.decrypt_text(text[i], key);
+                cout << "Decrypted text: " << text[i] << endl;
+            }
+        }
+        cout << "Operation is successful" << endl;
+    }
     void encrypt_decrypt() {
         int choice, key;
         char input_path[100], output_path[100];
@@ -852,9 +868,9 @@ public:
                 case COMMAND_ENCRYPT_DECRYPT:
                     encrypt_decrypt();
                     break;
-               // case COMMAND_CIPHER_CONSOLE:
-                   // encrypt_decrypt_console(text.text, text.line_count);
-                    //break;
+                case COMMAND_CIPHER_CONSOLE:
+                    encrypt_decrypt_console(text.text, text.line_count);
+                    break;
                 default:
                     printf("This command is not implemented\n");
             }
