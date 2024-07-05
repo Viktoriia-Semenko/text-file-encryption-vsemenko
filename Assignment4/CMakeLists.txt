@@ -3,6 +3,10 @@ project(Assignment4)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(Assignment4 main.cpp
-        caesar.cpp
+set(SOURCES
+        ../main.cpp
+        ../caesar.cpp
 )
+set(EXEC_SOURCES main.cpp)
+add_library(libcaesar SHARED ${SOURCES})
+add_executable(Assignment4 ${EXEC_SOURCES})

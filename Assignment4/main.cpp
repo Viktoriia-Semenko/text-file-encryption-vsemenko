@@ -22,17 +22,19 @@ public:
     {
         handle = dlopen(path_to_lib, RTLD_LAZY);
         if (!handle) {
-            cerr << "Lib not found" << dlerror() << endl;
-            exit(EXIT_FAILURE);
+            string error_message = "Library not found: ";
+            error_message += dlerror();
+            throw runtime_error(error_message);
         }
 
         encrypt = (encrypt_func)dlsym(handle, "encrypt");
         decrypt = (decrypt_func)dlsym(handle, "decrypt");
 
         if (encrypt == nullptr || decrypt == nullptr) {
-            cerr << "Proc not found" << dlerror() << endl;
+            string error_message = "Procedure not found: ";
+            error_message += dlerror();
             dlclose(handle);
-            exit(EXIT_FAILURE);
+            throw runtime_error(error_message);
         }
     }
     ~CaesarCipher(){
@@ -300,11 +302,9 @@ public:
 class Text
 {
 private:
-//    char** text;
     char* clipboard; // буфер обміну
     int row_number;
     int buffer_size;
-//    int line_count;
     UndoRedoBuffer undo_redo_buffer;
     ConsoleInput console_input;
 
@@ -667,21 +667,22 @@ public:
             buffer_size = new_length + 1;
         }
 
-        size_t replace_length = current_length - index; // обчислення довжини тексту, який треба замінити
-        if (replace_length > strnlen(buffer, local_buffer_size)) // чи довжина заміни більша за довжину нового тексту
-            replace_length = strnlen(buffer, local_buffer_size); // тоді довжина заміна - довжина тексту інпут
+        size_t replace_length = current_length - index;
+        if (replace_length > strnlen(buffer, local_buffer_size));
+            replace_length = strnlen(buffer, local_buffer_size);
 
-        strncpy(text[line] + index, buffer, replace_length); // копіювання в рядок починаючи з індекса вставки
+        strncpy(text[line] + index, buffer, replace_length);
         if (replace_length < strnlen(buffer, local_buffer_size))
             strncat(text[line], buffer + replace_length, strnlen(buffer + replace_length, local_buffer_size));
-        // додавання тексту що залишився після вставки нового
+
 
         free(buffer);
 
         cout << "Text has been inserted with replacement." << endl;
-        //save_redo_state();
+        save_redo_state();
     }
 };
+
 enum Commands {
     COMMAND_HELP = 0,
     COMMAND_APPEND = 1,
@@ -706,7 +707,6 @@ class CommandLineInterface
 {
 private:
     const int CHUNK_SIZE = 128;
-    CaesarCipher cipher;
     ConsoleInput console_input;
 public:
     static void print_help() {
@@ -743,6 +743,7 @@ public:
         }
     }
     void encrypt_decrypt_console(char** text, int line_count) {
+        CaesarCipher cipher("../libcaesar.so");
         int choice, key;
         console_input.encrypt_decrypt_choice(choice);
         console_input.key_for_cipher(key);
@@ -759,6 +760,7 @@ public:
         cout << "Operation is successful" << endl;
     }
     void encrypt_decrypt() {
+        CaesarCipher cipher("../libcaesar.so");
         int choice, key;
         char input_path[100], output_path[100];
 
@@ -780,7 +782,7 @@ public:
             return;
         }
 
-        char chunk[CHUNK_SIZE + 1];
+        char chunk[CHUNK_SIZE];
         size_t bytes_read;
 
         while ((bytes_read = fread(chunk, sizeof chunk[0], CHUNK_SIZE, input_file)) > 0) {
@@ -798,15 +800,13 @@ public:
         cout << "File has been processed successfully" << endl;
     }
 
-   explicit CommandLineInterface(const CaesarCipher& cipher) : cipher(cipher) {}
-
     void run(){
         int rows = 10;
         int buffer_size = 256;
         int user_command;
 
         Text text(rows, buffer_size);
-        //CaesarCipher caesar_cipher("../libcaesar.so");
+        // CaesarCipher caesar_cipher("..../libcaesar.so");
         FileHandler file_handler;
 
         print_help();
@@ -886,8 +886,14 @@ public:
 };
 
 int main() {
-    CaesarCipher caesar_cipher("../libcaesar.so");
-    CommandLineInterface command_line(caesar_cipher);
-    command_line.run();
+    try {
+
+        CommandLineInterface command_line;
+        command_line.run();
+    }
+    catch (...) {
+        cerr << "Lib not found" <<  endl;
+    }
+
     return 0;
 }
